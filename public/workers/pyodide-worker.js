@@ -10,7 +10,7 @@ async function initPyodideEngine() {
 
   const pyodide = await loadPyodide({ indexURL: PYODIDE_CDN });
 
-  self.postMessage({ type: 'status', status: 'loading-packages', message: 'Cargando NumPy en el navegador...' });
+  self.postMessage({ type: 'status', status: 'loading-packages', message: 'Cargando NumPy en memoria local...' });
   await pyodide.loadPackage(['numpy']);
 
   self.postMessage({ type: 'status', status: 'loading-dsp', message: 'Montando módulos dsp_engine...' });
@@ -32,15 +32,23 @@ async function initPyodideEngine() {
   }
 
   await pyodide.runPythonAsync(`
-import sys
+import sys, json
 if '/home/pyodide' not in sys.path:
     sys.path.insert(0, '/home/pyodide')
 import dsp_engine.bridge as bridge
   `);
 
-  self.postMessage({ type: 'status', status: 'ready', message: 'Motor Python DSP listo (latencia local 0 ms).' });
+  self.postMessage({ type: 'status', status: 'ready', message: 'Motor Python/NumPy listo (0 ms latencia de red).' });
   return pyodide;
 }
+
+const ACTION_MAP = {
+  runCoreDemo: 'run_core_pipeline_demo',
+  runAudioScan: 'run_audio_signal_scan',
+  runImageScan: 'run_image_scan',
+  runBitstreamScan: 'run_bitstream_scan',
+  exportWavBase64: 'export_wav_base64',
+};
 
 self.onmessage = async (event) => {
   const { id, action, payload } = event.data;
@@ -55,17 +63,16 @@ self.onmessage = async (event) => {
       return;
     }
 
-    if (action === 'runCoreDemo') {
-      pyodide.globals.set('_js_params', pyodide.toPy(payload));
-      const pyResult = await pyodide.runPythonAsync(`
-import json
-json.dumps(bridge.run_core_pipeline_demo(_js_params))
-      `);
-      self.postMessage({ id, ok: true, result: JSON.parse(pyResult) });
-      return;
+    const pyFunc = ACTION_MAP[action];
+    if (!pyFunc) {
+      throw new Error(`Acción desconocida en Pyodide Worker: ${action}`);
     }
 
-    throw new Error(`Acción desconocida en Pyodide Worker: ${action}`);
+    pyodide.globals.set('_js_params', pyodide.toPy(payload ?? {}));
+    const jsonResult = await pyodide.runPythonAsync(
+      `json.dumps(bridge.${pyFunc}(_js_params))`
+    );
+    self.postMessage({ id, ok: true, result: JSON.parse(jsonResult) });
   } catch (err) {
     self.postMessage({
       id,

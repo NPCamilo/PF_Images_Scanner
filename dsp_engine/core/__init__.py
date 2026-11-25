@@ -13,6 +13,14 @@ from .image_utils import (
     image_to_bitstream,
     image_to_signal_vector,
 )
+from .spectrogram import compute_spectrogram
+from .audio_wav import decode_wav_bytes, encode_wav_bytes
+from .bit_trace import (
+    bits_to_hex,
+    generate_bit_trace_waveform,
+    hex_to_bits,
+    text_to_bits,
+)
 
 __all__ = [
     "generate_synthetic_signal",
@@ -31,4 +39,11 @@ __all__ = [
     "image_to_bitstream",
     "bitstream_to_image",
     "extract_red_dominant_mask",
+    "compute_spectrogram",
+    "encode_wav_bytes",
+    "decode_wav_bytes",
+    "generate_bit_trace_waveform",
+    "text_to_bits",
+    "hex_to_bits",
+    "bits_to_hex",
 ]
