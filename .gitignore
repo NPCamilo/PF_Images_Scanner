@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# Testing & Coverage
+coverage/
+
+# Environment & Local IDE
+.env*
+.vercel
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
