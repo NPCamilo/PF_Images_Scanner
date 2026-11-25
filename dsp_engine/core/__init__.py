@@ -21,6 +21,7 @@ from .bit_trace import (
     hex_to_bits,
     text_to_bits,
 )
+from .cross_pipeline import execute_cross_pipeline
 
 __all__ = [
     "generate_synthetic_signal",
@@ -46,4 +47,5 @@ __all__ = [
     "text_to_bits",
     "hex_to_bits",
     "bits_to_hex",
+    "execute_cross_pipeline",
 ]

@@ -14,6 +14,7 @@ from dsp_engine.core import (
     compute_spectrogram,
     compute_spectrum,
     encode_wav_bytes,
+    execute_cross_pipeline,
     extract_red_dominant_mask,
     generate_bit_trace_waveform,
     generate_prbs,
@@ -261,6 +262,11 @@ def export_wav_base64(params: Dict[str, Any]) -> str:
     bit_depth = int(params.get("bitDepth", 16))
     wav_data = encode_wav_bytes(samples, fs=fs, bit_depth=bit_depth)
     return base64.b64encode(wav_data).decode("ascii")
+
+
+def run_cross_pipeline(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Ejecuta el Pipeline Cruzado Imagen -> Bit -> Audio CW -> Canal -> Demodulación -> Imagen."""
+    return execute_cross_pipeline(params)
 
 
 def run_core_pipeline_demo(params: Dict[str, Any]) -> Dict[str, Any]:

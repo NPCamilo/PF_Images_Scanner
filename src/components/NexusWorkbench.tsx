@@ -6,6 +6,7 @@ import {
   Binary,
   Download,
   Image as ImageIcon,
+  Layers,
   Mic,
   Play,
   Radio,
@@ -18,6 +19,7 @@ import {
   decodeAudioFileToMono,
   playSignalAudio,
 } from '@/audio/webAudioEngine';
+import { CrossPipelineTab } from '@/components/CrossPipelineTab';
 import { BitTraceCanvas } from '@/components/canvas/BitTraceCanvas';
 import { OscilloscopeCanvas } from '@/components/canvas/OscilloscopeCanvas';
 import { SpectrogramCanvas } from '@/components/canvas/SpectrogramCanvas';
@@ -153,7 +155,7 @@ export function NexusWorkbench() {
     status: 'idle',
     message: 'Iniciando entorno...',
   });
-  const [activeTab, setActiveTab] = useState<'audio' | 'image' | 'bitstream'>('audio');
+  const [activeTab, setActiveTab] = useState<'cross' | 'audio' | 'image' | 'bitstream'>('cross');
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -260,7 +262,7 @@ export function NexusWorkbench() {
     if (pyStatus.status !== 'ready') return;
     if (activeTab === 'audio') void executeAudioScan();
     else if (activeTab === 'image') void executeImageScan();
-    else void executeBitstreamScan();
+    else if (activeTab === 'bitstream') void executeBitstreamScan();
   }, [pyStatus.status, activeTab, executeAudioScan, executeImageScan, executeBitstreamScan]);
 
   const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -376,13 +378,14 @@ export function NexusWorkbench() {
               Nexus-DSP · Scanner de Imagen, Audio y Traza de Bits
             </h1>
             <p className="mt-1 text-xs text-zinc-400">
-              Motor Python + NumPy en Pyodide WebAssembly · Fase 2 Core Interactivo
+              Motor Python + NumPy en Pyodide WebAssembly · Fase 3 Pipeline Cruzado Activo
             </p>
           </div>
 
           <nav className="flex flex-wrap gap-2">
             {(
               [
+                { id: 'cross', label: 'Pipeline Cruzado', icon: Layers },
                 { id: 'audio', label: 'Audio & Señal x(t)', icon: Waves },
                 { id: 'image', label: 'Imagen 2D & Escáner', icon: ImageIcon },
                 { id: 'bitstream', label: 'Traza de Bits (BB)', icon: Binary },
@@ -409,6 +412,14 @@ export function NexusWorkbench() {
           <div className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-xs text-rose-200">
             {errorMsg}
           </div>
+        )}
+
+        {/* TAB 0: PIPELINE CRUZADO END-TO-END */}
+        {activeTab === 'cross' && (
+          <CrossPipelineTab
+            pyodideReady={pyStatus.status === 'ready'}
+            onError={setErrorMsg}
+          />
         )}
 
         {/* TAB 1: AUDIO Y SEÑAL x(t) / x[n] */}
@@ -932,7 +943,7 @@ export function NexusWorkbench() {
             </div>
             <div className="flex flex-wrap gap-2 font-mono text-[11px]">
               <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-300">
-                Camilo · Core/WebAudio/Canvas (Fase 2 Lista)
+                Camilo · Core/Pipeline Cruzado/Canvas (Fase 3 Lista)
               </span>
               <span className="rounded-md border border-white/10 bg-zinc-950 px-2.5 py-1 text-zinc-400">
                 Ángel · Modulación CW/AWGN (Rama Lista)

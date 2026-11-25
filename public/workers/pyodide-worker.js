@@ -47,6 +47,7 @@ const ACTION_MAP = {
   runAudioScan: 'run_audio_signal_scan',
   runImageScan: 'run_image_scan',
   runBitstreamScan: 'run_bitstream_scan',
+  runCrossPipeline: 'run_cross_pipeline',
   exportWavBase64: 'export_wav_base64',
 };
 

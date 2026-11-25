@@ -6,6 +6,7 @@ from dsp_engine.bridge import (
     run_audio_signal_scan,
     run_bitstream_scan,
     run_core_pipeline_demo,
+    run_cross_pipeline,
     run_image_scan,
 )
 from dsp_engine.core import (
@@ -153,6 +154,38 @@ class TestCoreDspPhase1And2(unittest.TestCase):
         b64 = export_wav_base64({"samples": [0.0, 0.5, -0.5, 0.0], "fs": 8000, "bitDepth": 16})
         self.assertTrue(len(b64) > 20)
         self.assertEqual(run_core_pipeline_demo({"frequencyHz": 220})["quantization"]["bitDepth"], 8)
+
+    def test_cross_pipeline_zero_ber_and_awgn_degradation(self):
+        for scheme in ("BPSK", "FSK", "ASK"):
+            clean = run_cross_pipeline(
+                {
+                    "width": 16,
+                    "height": 16,
+                    "pattern": "bars",
+                    "bitDepth": 8,
+                    "useCompression": True,
+                    "modulation": scheme,
+                    "snrDb": 60.0,
+                }
+            )
+            self.assertEqual(clean["metrics"]["ber"], 0.0)
+            self.assertEqual(clean["metrics"]["bitErrors"], 0)
+            self.assertAlmostEqual(clean["metrics"]["pearsonCorrelation"], 1.0, places=5)
+            self.assertGreaterEqual(clean["compression"]["compressionRatio"], 1.5)
+
+        noisy = run_cross_pipeline(
+            {
+                "width": 16,
+                "height": 16,
+                "pattern": "target",
+                "bitDepth": 4,
+                "useCompression": False,
+                "modulation": "BPSK",
+                "snrDb": -8.0,
+            }
+        )
+        self.assertGreater(noisy["metrics"]["ber"], 0.0)
+        self.assertGreater(len(noisy["demodulation"]["eyeTraces"]), 5)
 
 
 if __name__ == "__main__":
