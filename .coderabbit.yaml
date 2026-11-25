@@ -6,11 +6,11 @@ reviews:
   poem: false
   review_status: true
   path_instructions:
-    - path: "src/types/dsp.ts"
-      instructions: "Archivo de contratos críticos congelados. Alertar de inmediato si cualquier cambio rompe compatibilidad hacia atrás con los 4 módulos DSP."
-    - path: "src/dsp/**/*.ts"
-      instructions: "Verificar rigor matemático DSP: evitar divisiones por cero, validar potencia de 2 en FFT, comprobar estabilidad de filtros IIR y exigir uso de Float64Array/Uint8Array en operaciones vectoriales."
-    - path: "tests/**/*.test.ts"
-      instructions: "Verificar que los tests validen invariantes físicas (Parseval, BER=0 sin ruido, MSE=0 en lossless, Nyquist) y no solo aserciones triviales."
+    - path: "dsp_engine/contracts.py"
+      instructions: "Archivo de contratos críticos congelados en Python. Alertar de inmediato si cualquier cambio rompe compatibilidad hacia atrás con los 4 módulos DSP o con src/types/dsp.ts."
+    - path: "dsp_engine/**/*.py"
+      instructions: "Verificar rigor matemático DSP y compatibilidad con Pyodide (evitar dependencias C no incluidas en Pyodide como Pillow/soundfile; usar NumPy/SciPy vectorizado, evitar divisiones por cero y validar estabilidad de filtros IIR)."
+    - path: "tests_py/**/*.py"
+      instructions: "Verificar que las pruebas validen invariantes físicas (Parseval, BER=0 sin ruido, MSE=0 en lossless, Nyquist) y no solo aserciones triviales."
 chat:
   auto_reply: true

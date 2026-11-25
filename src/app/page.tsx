@@ -11,17 +11,22 @@ export default function HomePage() {
 
       <section className="relative mx-auto max-w-5xl rounded-2xl border border-white/10 bg-zinc-900/80 p-8 backdrop-blur-md">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-400">
-          UTP · Comunicaciones I · Fase 1 Core Listo
+          UTP · Comunicaciones I · Python + Pyodide WASM Core Listo
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">
           Nexus-DSP: Scanner de Imagen, Audio y Traza de Bits
         </h1>
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-zinc-400">
-          Arquitectura Client-Side con contratos congelados en{' '}
+          Motor matemático en Python + NumPy ejecutado 100% en el navegador mediante
+          Web Worker Pyodide (WebAssembly), con contratos congelados en{' '}
+          <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-200">
+            dsp_engine/contracts.py
+          </code>{' '}
+          y{' '}
           <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-200">
             src/types/dsp.ts
-          </code>{' '}
-          y núcleo matemático verificado (FFT Radix-2, NQS, PCM Byte/Bit y matriz 2D).
+          </code>
+          .
         </p>
       </section>
     </main>

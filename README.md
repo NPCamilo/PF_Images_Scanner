@@ -4,18 +4,14 @@
 **Docente:** Ing. José Oscar Sánchez Rendón  
 **Equipo:** Camilo Ramírez (Arquitecto Líder), Ángel Gabriel Burbano, Luis Ospina, Mariano Orrego.
 
-Estación de trabajo web **100% Client-Side** (Next.js + TypeScript `Float64Array` + Web Workers + Web Audio API + HTML5 Canvas) diseñada para la adquisición, síntesis, análisis espectral (FFT/NQS), cuantización PCM, compresión (RLE/Huffman/DCT/$\mu$-law), modulación (BB/CW), simulación de canal AWGN, demodulación, reconstrucción DAC y auditoría cuantitativa de señales $x(t)$ y $x[n]$.
+Estación de trabajo web **100% Client-Side con Python en el Navegador (Pyodide WebAssembly + NumPy/SciPy + Web Workers + Next.js + Web Audio API + Canvas)** para adquisición, síntesis, análisis espectral (FFT/NQS), cuantización PCM, compresión, modulación (BB/CW), canal AWGN, demodulación, reconstrucción DAC y auditoría cuantitativa.
 
 ## Comandos Rápidos
 
 ```bash
-npm install        # Instalar dependencias
-npm run dev        # Servidor local de desarrollo (http://localhost:3000)
-npm run typecheck  # Validación estricta TypeScript
-npm run test       # Suite de pruebas matemáticas DSP en Vitest
-npm run verify     # Puerta de calidad completa (typecheck + test + build)
+pip install -r requirements.txt  # Instalar NumPy/SciPy para pruebas locales Python
+npm install                      # Instalar dependencias Next.js
+npm run test:py                  # Ejecutar suite matemática en Python (unittest)
+npm run dev                      # Sincronizar dsp_engine/*.py y levantar servidor web
+npm run verify                   # Puerta completa: sync:py + test:py + typecheck + build
 ```
-
-## Documentación Técnica
-- **SRS y Plan del Sprint:** Ver `../docs/SRS_Scanner_Imagen_Audio_Bit.md`
-- **Flujo de Trabajo del Equipo:** Ver `CONTRIBUTING.md`

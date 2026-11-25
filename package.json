@@ -2,15 +2,17 @@
   "name": "nexus-dsp",
   "version": "0.1.0",
   "private": true,
-  "description": "Nexus-DSP: Scanner Unificado de Imagen, Audio y Traza de Bits (Comunicaciones I - UTP)",
+  "description": "Nexus-DSP: Scanner Unificado de Imagen, Audio y Traza de Bits (Python + Pyodide WASM + Next.js)",
   "scripts": {
+    "sync:py": "node scripts/sync-python.mjs",
+    "predev": "npm run sync:py",
     "dev": "next dev",
+    "prebuild": "npm run sync:py",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "verify": "npm run typecheck && npm run test && npm run build"
+    "test:py": "python -m unittest discover -s tests_py -v",
+    "verify": "npm run sync:py && npm run test:py && npm run typecheck && npm run build"
   },
   "dependencies": {
     "lucide-react": "^1.72.0",
@@ -24,7 +26,6 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "tailwindcss": "^4.1.0",
-    "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "typescript": "^5.7.0"
   }
 }

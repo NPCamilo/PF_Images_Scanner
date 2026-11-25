@@ -1,16 +1,15 @@
 # Dependencies
 node_modules/
-.pnp
-.pnp.*
+__pycache__/
+*.pyc
+.pytest_cache/
 
-# Next.js
+# Next.js & Generated Pyodide Mirror
 .next/
 out/
 build/
 next-env.d.ts
-
-# Testing & Coverage
-coverage/
+public/dsp_engine/
 
 # Environment & Local IDE
 .env*

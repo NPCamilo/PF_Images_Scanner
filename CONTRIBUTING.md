@@ -1,37 +1,30 @@
-# Flujo de Trabajo y Gobernanza — Nexus-DSP (Sprint 7 Días)
+# Flujo de Trabajo y Gobernanza — Nexus-DSP (Python + Pyodide WASM)
 
-Este repositorio implementa el proyecto final **Scanner de Imagen - Audio - Bit (Sw)** para Comunicaciones I (UTP). Para minimizar errores de integración y maximizar velocidad, todo el equipo opera bajo la disciplina **Contract-First + Doubt-Driven Development (DDD)**.
-
----
-
-## 1. Reglas de Ramas e Integración
-
-- `main`: Producción estable (desplegada en Vercel). **Prohibido hacer push directo.**
-- `dev`: Rama de integración continua. Solo recibe Pull Requests con CI en verde.
-- Ramas personales por especialidad:
-  - `feat/core-ui-camilo` → Camilo Ramírez (`src/dsp/core/`, `src/workers/`, `src/audio/`, `src/components/`)
-  - `feat/modulation-angel` → Ángel Gabriel Burbano (`src/dsp/modulation/`)
-  - `feat/demodulation-luis` → Luis Ospina (`src/dsp/demodulation/`)
-  - `feat/compression-docs-mariano` → Mariano Orrego (`src/dsp/compression/`, actualización LaTeX)
+Este repositorio implementa el proyecto final **Scanner de Imagen - Audio - Bit (Sw)** para Comunicaciones I (UTP). El motor matemático se desarrolla **100% en Python (`numpy` / `scipy`)** y se ejecuta directamente en el navegador dentro de un **Web Worker con Pyodide (WebAssembly)** para lograr latencia cero en la sustentación.
 
 ---
 
-## 2. Flujo de Trabajo Diario (Mínimo Margen de Error)
+## 1. Ramas por Integrante
 
-1. **Sincronizar antes de codificar:**
+- `main`: Producción estable (Vercel). **Prohibido push directo.**
+- `dev`: Integración continua.
+- Ramas personales:
+  - `feat/core-ui-camilo` → Camilo Ramírez (`dsp_engine/core/`, `dsp_engine/bridge.py`, `src/`, `public/workers/`)
+  - `feat/modulation-angel` → Ángel Gabriel Burbano (`dsp_engine/modulation/`)
+  - `feat/demodulation-luis` → Luis Ospina (`dsp_engine/demodulation/`)
+  - `feat/compression-docs-mariano` → Mariano Orrego (`dsp_engine/compression/`, Informe LaTeX)
+
+---
+
+## 2. Regla de Oro para Compatibilidad en Navegador (Pyodide)
+
+1. Los módulos dentro de `dsp_engine/` deben usar únicamente librería estándar de Python + `numpy` + `scipy` (no importar `matplotlib`, `cv2`, `Pillow` ni `sounddevice` dentro de `dsp_engine/`).
+2. Toda función pura recibe/retorna las estructuras congeladas de `dsp_engine/contracts.py`.
+3. Toda función nueva debe tener pruebas unitarias en `tests_py/` ejecutables con:
    ```bash
-   git checkout dev
-   git pull origin dev
-   git checkout feat/tu-rama
-   git merge dev
+   python -m unittest discover -s tests_py -v
    ```
-2. **Consultar el contrato congelado:** Leer `src/types/dsp.ts`. Todas las funciones puras reciben y retornan las interfaces allí definidas.
-3. **Implementar con pruebas unitarias paralelas (TDD/DDD):**
-   - Cada algoritmo en `src/dsp/<modulo>/` debe tener su prueba correspondiente en `tests/<modulo>.test.ts`.
-   - No asumas que una fórmula funciona porque no arroja excepción: valida casos límite (señal nula `0`, frecuencia de Nyquist exacta $F_s = 2f_{\max}$, ruido extremo, bitstreams de 1 bit).
-4. **Verificación Local Obligatoria antes de Push:**
+4. Antes de abrir Pull Request hacia `dev`, ejecutar la puerta completa:
    ```bash
    npm run verify
    ```
-   *(Ejecuta secuencialmente `tsc --noEmit`, `vitest run` y `next build`)*
-5. **Abrir Pull Request hacia `dev`:** Completar la plantilla de PR y resolver cualquier hallazgo reportado por **CodeRabbit** y GitHub Actions.
