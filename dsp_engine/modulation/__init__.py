@@ -1,9 +1,46 @@
 """
-Módulo de Modulación Banda Base, Portadora CW y Canal AWGN
-Responsable asignado: Ángel Gabriel Burbano (feat/modulation-angel)
+Módulo de Modulación Banda Base, Portadora CW y Canal AWGN — Nexus-DSP
+Responsable: Ángel Gabriel Burbano (Bloque C)
 
-Contratos en dsp_engine/contracts.py:
-- ModulatedSignal, ChannelOutput, LineCodingType, ModulationType
+Exportaciones principales:
+- Codificación en Banda Base: encode_baseband, generate_symbol_clock
+- Modulación CW Analógica: modulate_am_lc, modulate_am_sc, modulate_fm, compute_carson_bandwidth
+- Modulación Digital Pasobanda: modulate_ask, modulate_fsk, modulate_bpsk, modulate_qpsk
+- Canal AWGN: simulate_awgn_channel, generate_box_muller_noise
 """
 
+from .baseband import encode_baseband, generate_symbol_clock
+from .analog import (
+    compute_carson_bandwidth,
+    modulate_am_lc,
+    modulate_am_sc,
+    modulate_fm,
+)
+from .digital import (
+    modulate_ask,
+    modulate_bpsk,
+    modulate_fsk,
+    modulate_qpsk,
+)
+from .channel import (
+    generate_box_muller_noise,
+    simulate_awgn_channel,
+)
+
 MODULATION_MODULE_OWNER = "Ángel Gabriel Burbano"
+
+__all__ = [
+    "MODULATION_MODULE_OWNER",
+    "encode_baseband",
+    "generate_symbol_clock",
+    "modulate_am_lc",
+    "modulate_am_sc",
+    "modulate_fm",
+    "compute_carson_bandwidth",
+    "modulate_ask",
+    "modulate_bpsk",
+    "modulate_fsk",
+    "modulate_qpsk",
+    "generate_box_muller_noise",
+    "simulate_awgn_channel",
+]
