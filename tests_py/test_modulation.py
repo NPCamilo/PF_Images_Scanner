@@ -6,8 +6,16 @@ Responsable: Ángel Gabriel Burbano (tests_py/test_modulation.py)
 import unittest
 import numpy as np
 
-from dsp_engine.core import compute_spectrum, generate_prbs
-from dsp_engine.modulation import encode_baseband, generate_symbol_clock
+from dsp_engine.core import compute_spectrum, generate_prbs, generate_synthetic_signal
+from dsp_engine.contracts import Signal1D
+from dsp_engine.modulation import (
+    compute_carson_bandwidth,
+    encode_baseband,
+    generate_symbol_clock,
+    modulate_am_lc,
+    modulate_am_sc,
+    modulate_fm,
+)
 
 
 class TestBasebandLineCoding(unittest.TestCase):
@@ -175,6 +183,186 @@ class TestBasebandLineCoding(unittest.TestCase):
         # Esquema desconocido
         with self.assertRaises(ValueError):
             encode_baseband([1, 0], line_coding="invalid-coding")  # type: ignore
+
+
+
+class TestAnalogModulation(unittest.TestCase):
+    """Pruebas unitarias matemáticas para RF-09 (Modulación CW Analógica: AM-LC, AM-SC, FM)."""
+
+    def test_carson_bandwidth_calculation(self):
+        # FM Comercial: Δf = 75 kHz, fm = 15 kHz -> BW = 2 * (75 + 15) = 180 kHz
+        bw = compute_carson_bandwidth(frequency_deviation_hz=75000.0, message_f_max_hz=15000.0)
+        self.assertEqual(bw, 180000.0)
+
+        with self.assertRaises(ValueError):
+            compute_carson_bandwidth(0.0, 1000.0)
+        with self.assertRaises(ValueError):
+            compute_carson_bandwidth(500.0, -10.0)
+
+    def test_am_lc_modulation_and_spectral_translation(self):
+        # Usar Fs potencia de 2 y frecuencias armónicas para evitar leakage por zero-padding en FFT
+        fs = 8192.0
+        fm = 128.0
+        fc = 1024.0
+        m = 0.5
+        ac = 2.0
+
+        msg = generate_synthetic_signal(
+            waveform="cosine",
+            amplitude=1.0,
+            frequency_hz=fm,
+            duration_sec=1.0,
+            fs=fs,
+        )
+
+        mod = modulate_am_lc(
+            signal=msg,
+            carrier_hz=fc,
+            modulation_index=m,
+            carrier_amplitude=ac,
+        )
+
+        self.assertEqual(mod.scheme, "AM-LC")
+        self.assertEqual(mod.carrier_hz, fc)
+        self.assertEqual(mod.modulation_index, m)
+        self.assertEqual(mod.estimated_bandwidth_hz, 2.0 * fm)
+        self.assertEqual(len(mod.waveform), len(msg.samples))
+
+        # Envolvente: siempre positiva cuando m <= 1.0 (sin inversión de fase)
+        # Ac * (1 - m) <= s(t) envelope <= Ac * (1 + m) -> min = 1.0, max = 3.0
+        peak_envelope = np.max(np.abs(mod.waveform))
+        self.assertAlmostEqual(peak_envelope, ac * (1.0 + m), delta=0.05)
+
+        # Verificación espectral mediante FFT
+        sig_mod = Signal1D(
+            id="am-lc-fft",
+            samples=mod.waveform,
+            fs=fs,
+            ts=1.0 / fs,
+            duration=1.0,
+            is_discrete=False,
+            label="AM-LC Test",
+        )
+        spec = compute_spectrum(sig_mod, window="rectangular")
+
+        # Frecuencia dominante en fc (portadora fuerte)
+        self.assertLess(abs(spec.dominant_frequency_hz - fc), 2.0)
+
+        # Localizar magnitudes de portadora (fc) y bandas laterales (fc - fm, fc + fm)
+        idx_carrier = int(round(fc * spec.fft_size / fs))
+        idx_lsb = int(round((fc - fm) * spec.fft_size / fs))
+        idx_usb = int(round((fc + fm) * spec.fft_size / fs))
+
+        mag_carrier = spec.magnitudes[idx_carrier]
+        mag_lsb = spec.magnitudes[idx_lsb]
+        mag_usb = spec.magnitudes[idx_usb]
+
+        # Relación teórica: mag_lsb / mag_carrier ≈ m / 2 = 0.25
+        self.assertAlmostEqual(mag_lsb / mag_carrier, m / 2.0, delta=0.02)
+        self.assertAlmostEqual(mag_usb / mag_carrier, m / 2.0, delta=0.02)
+
+        # En banda base (fm = 128 Hz), la energía debe estar suprimida (traslación exitosa a fc)
+        idx_baseband = int(round(fm * spec.fft_size / fs))
+        self.assertLess(spec.magnitudes[idx_baseband] / mag_carrier, 0.01)
+
+    def test_am_sc_carrier_suppression(self):
+        fs = 8000.0
+        fm = 100.0
+        fc = 1000.0
+        ac = 1.0
+
+        msg = generate_synthetic_signal(
+            waveform="cosine",
+            amplitude=1.0,
+            frequency_hz=fm,
+            duration_sec=1.0,
+            fs=fs,
+        )
+
+        mod = modulate_am_sc(
+            signal=msg,
+            carrier_hz=fc,
+            carrier_amplitude=ac,
+        )
+
+        self.assertEqual(mod.scheme, "AM-SC")
+        self.assertEqual(mod.carrier_hz, fc)
+        self.assertEqual(mod.estimated_bandwidth_hz, 2.0 * fm)
+
+        # Análisis espectral: portadora en fc debe estar suprimida
+        sig_mod = Signal1D(
+            id="am-sc-fft",
+            samples=mod.waveform,
+            fs=fs,
+            ts=1.0 / fs,
+            duration=1.0,
+            is_discrete=False,
+            label="AM-SC Test",
+        )
+        spec = compute_spectrum(sig_mod, window="rectangular")
+
+        idx_carrier = int(round(fc * spec.fft_size / fs))
+        idx_usb = int(round((fc + fm) * spec.fft_size / fs))
+
+        mag_carrier = spec.magnitudes[idx_carrier]
+        mag_usb = spec.magnitudes[idx_usb]
+
+        # Portadora suprimida frente a bandas laterales (atenuación > 40 dB o cociente muy pequeño)
+        self.assertLess(mag_carrier / mag_usb, 0.01)
+
+    def test_fm_modulation_constant_envelope_and_carson_bw(self):
+        fs = 16000.0
+        fm = 50.0
+        fc = 2000.0
+        delta_f = 200.0
+        ac = 2.0
+
+        msg = generate_synthetic_signal(
+            waveform="cosine",
+            amplitude=1.0,
+            frequency_hz=fm,
+            duration_sec=0.5,
+            fs=fs,
+        )
+
+        mod = modulate_fm(
+            signal=msg,
+            carrier_hz=fc,
+            frequency_deviation_hz=delta_f,
+            carrier_amplitude=ac,
+        )
+
+        self.assertEqual(mod.scheme, "FM")
+        self.assertEqual(mod.carrier_hz, fc)
+        # Carson BW = 2 * (delta_f + fm) = 2 * (200 + 50) = 500 Hz
+        self.assertEqual(mod.estimated_bandwidth_hz, 500.0)
+        # Beta = delta_f / fm = 200 / 50 = 4.0
+        self.assertEqual(mod.modulation_index, 4.0)
+
+        # Envolvente constante en FM: |s(t)| <= Ac, y potencia media P ≈ Ac^2 / 2 = 2.0
+        measured_power = float(np.mean(mod.waveform ** 2))
+        expected_power = (ac ** 2) / 2.0
+        self.assertAlmostEqual(measured_power, expected_power, delta=0.08)
+
+    def test_analog_sampling_rate_and_validations(self):
+        # Caso de insuficiencia de Fs frente a Carson / Nyquist
+        with self.assertRaises(ValueError):
+            # fc = 2000, fm = 100 -> BW = 200 -> max freq = 2100 -> requiere fs >= 4200
+            modulate_am_lc(
+                signal=[1.0, 0.5, -0.5, -1.0],
+                carrier_hz=2000.0,
+                fs=3000.0,  # Insuficiente!
+                message_f_max_hz=100.0,
+            )
+
+        with self.assertRaises(ValueError):
+            modulate_am_lc([1.0, 0.0], carrier_hz=-100.0, fs=1000.0)
+
+        with self.assertRaises(ValueError):
+            modulate_am_lc([1.0, 0.0], carrier_hz=100.0, modulation_index=-0.1, fs=1000.0)
+
+        with self.assertRaises(ValueError):
+            modulate_fm([1.0, 0.0], carrier_hz=500.0, frequency_deviation_hz=-10.0, fs=2000.0)
 
 
 if __name__ == "__main__":
