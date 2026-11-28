@@ -11,6 +11,7 @@ from dsp_engine.contracts import Signal1D
 from dsp_engine.modulation import (
     compute_carson_bandwidth,
     encode_baseband,
+    generate_box_muller_noise,
     generate_symbol_clock,
     modulate_am_lc,
     modulate_am_sc,
@@ -19,6 +20,7 @@ from dsp_engine.modulation import (
     modulate_fm,
     modulate_fsk,
     modulate_qpsk,
+    simulate_awgn_channel,
 )
 
 
@@ -533,6 +535,97 @@ class TestDigitalModulation(unittest.TestCase):
         # Frecuencia de muestreo insuficiente (Nyquist)
         with self.assertRaises(ValueError):
             modulate_ask([1, 0], carrier_hz=2000.0, symbol_rate_baud=100.0, samples_per_symbol=4)
+
+
+
+class TestAwgnChannel(unittest.TestCase):
+    """Pruebas unitarias matemáticas para RF-10 (Simulador de Canal AWGN y Box-Muller)."""
+
+    def test_box_muller_distribution_properties(self):
+        n = 50000
+        target_sigma = 2.5
+        target_mean = 0.0
+
+        noise = generate_box_muller_noise(num_samples=n, std_dev=target_sigma, mean=target_mean, seed=0x1234)
+
+        self.assertEqual(len(noise), n)
+        # Media empírica cercana a 0
+        self.assertAlmostEqual(float(np.mean(noise)), target_mean, delta=0.03)
+        # Desviación estándar empírica cercana a 2.5
+        self.assertAlmostEqual(float(np.std(noise)), target_sigma, delta=0.03)
+
+        # Caso borde: std_dev == 0
+        zero_noise = generate_box_muller_noise(100, std_dev=0.0)
+        np.testing.assert_array_equal(zero_noise, np.zeros(100))
+
+        # Validaciones
+        with self.assertRaises(ValueError):
+            generate_box_muller_noise(0)
+        with self.assertRaises(ValueError):
+            generate_box_muller_noise(100, std_dev=-1.0)
+
+    def test_awgn_snr_calibration_exactness(self):
+        # Señal portadora continua limpia de potencia conocida: A = 2.0 -> P = A^2 / 2 = 2.0
+        fs = 8000.0
+        n_samples = 40000
+        t = np.arange(n_samples) / fs
+        sig = 2.0 * np.cos(2.0 * np.pi * 1000.0 * t)
+        p_sig = float(np.mean(sig ** 2))
+        self.assertAlmostEqual(p_sig, 2.0, delta=0.01)
+
+        # Probar múltiples SNRs de canal del control deslizante [0, 10, 20, 30 dB]
+        for target_snr in [0.0, 10.0, 20.0, 30.0]:
+            out = simulate_awgn_channel(sig, target_snr_db=target_snr, seed=42)
+
+            self.assertEqual(out.target_snr_db, target_snr)
+            self.assertEqual(len(out.noisy_waveform), n_samples)
+            self.assertEqual(len(out.noise_added), n_samples)
+
+            # Consistencia aditiva: s_ruidosa = s + ruido
+            np.testing.assert_allclose(out.noisy_waveform, sig + out.noise_added, atol=1e-12)
+
+            # Precisión de calibración de SNR real vs SNR objetivo (error < 0.25 dB para N=40000)
+            self.assertLess(abs(out.actual_snr_db - target_snr), 0.25)
+
+    def test_awgn_ideal_mode_infinite_snr(self):
+        sig = np.array([1.0, -0.5, 0.8, -0.2], dtype=np.float64)
+
+        # SNR infinita (modo ideal sin ruido)
+        out = simulate_awgn_channel(sig, target_snr_db=float("inf"))
+
+        self.assertEqual(out.target_snr_db, float("inf"))
+        self.assertEqual(out.actual_snr_db, float("inf"))
+        np.testing.assert_array_equal(out.noise_added, np.zeros_like(sig))
+        np.testing.assert_array_equal(out.noisy_waveform, sig)
+
+    def test_awgn_with_modulated_signal_and_filtering(self):
+        bits = [1, 0, 1, 1, 0, 0, 1, 0]
+        bpsk = modulate_bpsk(bits=bits, carrier_hz=1000.0, symbol_rate_baud=500.0, samples_per_symbol=16)
+
+        out = simulate_awgn_channel(
+            signal=bpsk,
+            target_snr_db=15.0,
+            seed=101,
+            filter_bandwidth_hz=1000.0,
+            center_freq_hz=1000.0,
+        )
+
+        self.assertEqual(out.target_snr_db, 15.0)
+        self.assertEqual(len(out.noisy_waveform), len(bpsk.waveform))
+        # Ruido y señal filtrados deben ser números finitos
+        self.assertTrue(np.all(np.isfinite(out.noisy_waveform)))
+        self.assertTrue(np.all(np.isfinite(out.noise_added)))
+
+    def test_awgn_channel_validations(self):
+        with self.assertRaises(ValueError):
+            simulate_awgn_channel([], target_snr_db=10.0)
+
+        # Señal plana en cero no permite calibrar SNR
+        with self.assertRaises(ValueError):
+            simulate_awgn_channel(np.zeros(100), target_snr_db=10.0)
+
+        with self.assertRaises(ValueError):
+            simulate_awgn_channel([1.0, -1.0], target_snr_db=-40.0)
 
 
 if __name__ == "__main__":

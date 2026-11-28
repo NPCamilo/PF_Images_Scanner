@@ -6,6 +6,7 @@ Exportaciones principales:
 - Codificación en Banda Base: encode_baseband, generate_symbol_clock
 - Modulación CW Analógica: modulate_am_lc, modulate_am_sc, modulate_fm, compute_carson_bandwidth
 - Modulación Digital Pasobanda: modulate_ask, modulate_fsk, modulate_bpsk, modulate_qpsk
+- Canal AWGN: simulate_awgn_channel, generate_box_muller_noise
 """
 
 from .baseband import encode_baseband, generate_symbol_clock
@@ -20,6 +21,10 @@ from .digital import (
     modulate_bpsk,
     modulate_fsk,
     modulate_qpsk,
+)
+from .channel import (
+    generate_box_muller_noise,
+    simulate_awgn_channel,
 )
 
 MODULATION_MODULE_OWNER = "Ángel Gabriel Burbano"
@@ -36,4 +41,6 @@ __all__ = [
     "modulate_bpsk",
     "modulate_fsk",
     "modulate_qpsk",
+    "generate_box_muller_noise",
+    "simulate_awgn_channel",
 ]
