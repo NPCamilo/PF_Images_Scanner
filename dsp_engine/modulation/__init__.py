@@ -1,9 +1,17 @@
 """
-Módulo de Modulación Banda Base, Portadora CW y Canal AWGN
-Responsable asignado: Ángel Gabriel Burbano (feat/modulation-angel)
+Módulo de Modulación Banda Base, Portadora CW y Canal AWGN — Nexus-DSP
+Responsable: Ángel Gabriel Burbano (Bloque C)
 
-Contratos en dsp_engine/contracts.py:
-- ModulatedSignal, ChannelOutput, LineCodingType, ModulationType
+Exportaciones principales:
+- Codificación en Banda Base: encode_baseband, generate_symbol_clock
 """
 
+from .baseband import encode_baseband, generate_symbol_clock
+
 MODULATION_MODULE_OWNER = "Ángel Gabriel Burbano"
+
+__all__ = [
+    "MODULATION_MODULE_OWNER",
+    "encode_baseband",
+    "generate_symbol_clock",
+]
