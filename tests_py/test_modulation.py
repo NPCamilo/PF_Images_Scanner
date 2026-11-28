@@ -14,7 +14,11 @@ from dsp_engine.modulation import (
     generate_symbol_clock,
     modulate_am_lc,
     modulate_am_sc,
+    modulate_ask,
+    modulate_bpsk,
     modulate_fm,
+    modulate_fsk,
+    modulate_qpsk,
 )
 
 
@@ -363,6 +367,172 @@ class TestAnalogModulation(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             modulate_fm([1.0, 0.0], carrier_hz=500.0, frequency_deviation_hz=-10.0, fs=2000.0)
+
+
+
+class TestDigitalModulation(unittest.TestCase):
+    """Pruebas unitarias matemáticas para RF-09 (Modulación Digital Pasobanda: ASK, BFSK, BPSK, QPSK)."""
+
+    def test_ask_ook_properties_and_constellation(self):
+        bits = [1, 0, 1, 0]
+        fc = 1000.0
+        rb = 500.0
+        sps = 16
+        ac = 2.0
+
+        mod = modulate_ask(
+            bits=bits,
+            carrier_hz=fc,
+            symbol_rate_baud=rb,
+            samples_per_symbol=sps,
+            carrier_amplitude=ac,
+        )
+
+        self.assertEqual(mod.scheme, "ASK")
+        self.assertEqual(mod.carrier_hz, fc)
+        self.assertEqual(mod.symbol_rate_baud, rb)
+        self.assertEqual(mod.samples_per_symbol, sps)
+        self.assertEqual(mod.estimated_bandwidth_hz, 2.0 * rb)
+        self.assertEqual(len(mod.waveform), len(bits) * sps)
+
+        # Para bit 0 (muestras 16..31 y 48..63), la onda debe ser estrictamente 0.0
+        bit0_samples = mod.waveform[16:32]
+        np.testing.assert_array_almost_equal(bit0_samples, np.zeros(sps))
+
+        # Para bit 1, el pico debe alcanzar ac
+        bit1_samples = mod.waveform[0:16]
+        self.assertAlmostEqual(float(np.max(bit1_samples)), ac, delta=0.05)
+
+        # Constelación ideal OOK
+        self.assertEqual(mod.ideal_constellation, [(0.0, 0.0), (ac, 0.0)])
+
+    def test_bpsk_phase_inversion_and_constellation(self):
+        bits = [1, 0]
+        fc = 1000.0
+        rb = 500.0
+        sps = 16
+        ac = 1.5
+
+        mod = modulate_bpsk(
+            bits=bits,
+            carrier_hz=fc,
+            symbol_rate_baud=rb,
+            samples_per_symbol=sps,
+            carrier_amplitude=ac,
+        )
+
+        self.assertEqual(mod.scheme, "BPSK")
+        self.assertEqual(mod.carrier_hz, fc)
+        self.assertEqual(mod.symbol_rate_baud, rb)
+        self.assertEqual(mod.estimated_bandwidth_hz, 2.0 * rb)
+
+        # Inversión de fase exacta: bit 0 es exactamente -bit 1
+        sym1 = mod.waveform[0:sps]
+        sym0 = mod.waveform[sps : 2 * sps]
+        np.testing.assert_array_almost_equal(sym0, -sym1)
+
+        # Potencia media de BPSK: P = Ac^2 / 2
+        measured_power = float(np.mean(mod.waveform ** 2))
+        expected_power = (ac ** 2) / 2.0
+        self.assertAlmostEqual(measured_power, expected_power, delta=0.05)
+
+        # Constelación simétrica antipodal
+        self.assertEqual(mod.ideal_constellation, [(-ac, 0.0), (ac, 0.0)])
+
+    def test_fsk_audible_and_custom_carrier(self):
+        bits = [1, 0, 1, 1, 0]
+        sps = 32
+        rb = 300.0
+        ac = 1.0
+
+        # Modo Audible estándar Bell 202 (f0=1200 Hz, f1=2200 Hz)
+        mod_audible = modulate_fsk(
+            bits=bits,
+            symbol_rate_baud=rb,
+            samples_per_symbol=sps,
+            carrier_amplitude=ac,
+            continuous_phase=True,
+        )
+
+        self.assertEqual(mod_audible.scheme, "FSK")
+        self.assertEqual(mod_audible.carrier_hz, 1700.0)
+        self.assertEqual(mod_audible.estimated_bandwidth_hz, abs(2200.0 - 1200.0) + 2.0 * rb)
+        self.assertEqual(len(mod_audible.waveform), len(bits) * sps)
+
+        # Envolvente constante en CPFSK
+        measured_power = float(np.mean(mod_audible.waveform ** 2))
+        self.assertAlmostEqual(measured_power, 0.5 * (ac ** 2), delta=0.05)
+
+        # Modo Pasabanda personalizado (fc = 4000 Hz, delta_f = 800 Hz)
+        mod_custom = modulate_fsk(
+            bits=bits,
+            carrier_hz=4000.0,
+            freq_shift_hz=800.0,
+            symbol_rate_baud=400.0,
+            samples_per_symbol=32,
+        )
+        self.assertEqual(mod_custom.carrier_hz, 4000.0)
+        self.assertEqual(mod_custom.estimated_bandwidth_hz, 1600.0 + 2.0 * 400.0)
+
+    def test_qpsk_constellation_and_bandwidth_efficiency(self):
+        # 8 bits -> 4 dibits
+        bits = [0, 0, 0, 1, 1, 0, 1, 1]
+        fc = 1000.0
+        rb = 500.0
+        sps = 16
+        ac = 2.0
+
+        mod = modulate_qpsk(
+            bits=bits,
+            carrier_hz=fc,
+            symbol_rate_baud=rb,
+            samples_per_symbol=sps,
+            carrier_amplitude=ac,
+        )
+
+        self.assertEqual(mod.scheme, "QPSK")
+        self.assertEqual(mod.carrier_hz, fc)
+        # Tasa de símbolos Rs = Rb / 2 = 250 Baud
+        self.assertEqual(mod.symbol_rate_baud, 250.0)
+        self.assertEqual(mod.samples_per_symbol, sps)
+        # Ancho de banda QPSK = 2 * Rs = Rb = 500 Hz (la mitad de BPSK)
+        self.assertEqual(mod.estimated_bandwidth_hz, rb)
+        self.assertEqual(len(mod.waveform), 4 * sps)
+
+        # Constelación 4-QAM / QPSK normalizada a vector de longitud Ac
+        d = ac / np.sqrt(2.0)
+        expected_points = [(-d, -d), (-d, d), (d, -d), (d, d)]
+        for pt, exp in zip(mod.ideal_constellation, expected_points):
+            self.assertAlmostEqual(pt[0], exp[0], places=6)
+            self.assertAlmostEqual(pt[1], exp[1], places=6)
+            # Norma de cada punto de constelación debe ser Ac
+            self.assertAlmostEqual(np.sqrt(pt[0] ** 2 + pt[1] ** 2), ac, places=6)
+
+        # Relleno de bit impar (ej. 5 bits -> pad a 6 bits = 3 símbolos)
+        mod_odd = modulate_qpsk(
+            bits=[1, 0, 1, 1, 0],
+            carrier_hz=fc,
+            symbol_rate_baud=rb,
+            samples_per_symbol=sps,
+        )
+        self.assertEqual(len(mod_odd.waveform), 3 * sps)
+
+    def test_digital_modulation_validations(self):
+        # Bitstream vacío
+        with self.assertRaises(ValueError):
+            modulate_ask([], carrier_hz=1000.0)
+
+        # Bits no binarios
+        with self.assertRaises(ValueError):
+            modulate_bpsk([0, 1, 3], carrier_hz=1000.0)
+
+        # Portadora negativa o cero
+        with self.assertRaises(ValueError):
+            modulate_qpsk([1, 0], carrier_hz=0.0)
+
+        # Frecuencia de muestreo insuficiente (Nyquist)
+        with self.assertRaises(ValueError):
+            modulate_ask([1, 0], carrier_hz=2000.0, symbol_rate_baud=100.0, samples_per_symbol=4)
 
 
 if __name__ == "__main__":
